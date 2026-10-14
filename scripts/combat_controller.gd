@@ -2,6 +2,7 @@ extends Node
 
 const BATTLE = preload("res://scripts/battle_state.gd")
 const COMBAT_ARCS = preload("res://scripts/combat_arcs.gd")
+const DAMAGE_CHOICE = preload("res://scripts/damage_choice.gd")
 var arcs: Control
 var state = BATTLE.new()
 var game: Control
@@ -87,7 +88,7 @@ func click_at(screen: Vector2) -> bool:
 	if state.phase == "attack" and state.active_owner == 0:
 		if unit.owner == 0:
 			if not state.can_attack(id):
-				message.text = "Esta carta só pode defender ou precisa aguardar seu próximo turno."
+				message.text = "Esta carta está virada ou precisa aguardar seu próximo turno."
 			else:
 				var marked := false
 				for order in state.attacks:
@@ -102,6 +103,8 @@ func click_at(screen: Vector2) -> bool:
 		return true
 	if awaiting_player_defense():
 		if unit.owner == 0:
+			if unit.used:
+				message.text = "Cartas viradas não podem bloquear."
 			if state.can_defend(id):
 				if selected == id:
 					state.remove_blocker(id)
@@ -155,16 +158,38 @@ func _choose_enemy_defenses() -> void:
 		var chosen := -1
 		var best := -100000
 		for candidate in state.units.values():
-			if not state.can_defend(candidate.id) or state.blockers.values().has(candidate.id):
+			if not state.can_defend(candidate.id) or state.assigned_defenders().has(candidate.id):
 				continue
 			var value: int = candidate.data.attack + candidate.data.health
-			var survives: bool = candidate.data.health >= attack
+			var survives: bool = candidate.data.health - candidate.damage > attack
 			var score := (10000 if survives else 0) - value
 			if score > best:
 				best = score
 				chosen = candidate.id
 		if chosen != -1:
 			state.assign_blocker(order.attacker, chosen)
+	# Add a group block when the available defenders can defeat the attacker.
+	for order in orders:
+		var group: Array = state.blockers.get(order.attacker, [])
+		if group.is_empty():
+			continue
+		var power := 0
+		for id in group:
+			power += maxi(0, state.units[id].data.attack)
+		var needed: int = state.units[order.attacker].data.health - state.units[order.attacker].damage
+		var available: Array = []
+		var extra := 0
+		for candidate in state.units.values():
+			if state.can_defend(candidate.id) and not state.assigned_defenders().has(candidate.id) and candidate.data.attack > 0:
+				available.append(candidate)
+				extra += candidate.data.attack
+		if power < needed and power + extra >= needed:
+			available.sort_custom(func(a, b): return a.data.attack > b.data.attack)
+			for candidate in available:
+				state.assign_blocker(order.attacker, candidate.id)
+				power += candidate.data.attack
+				if power >= needed:
+					break
 
 func resolve_combat() -> void:
 	if state.phase != "defense" or finished:
@@ -172,6 +197,11 @@ func resolve_combat() -> void:
 	busy = true
 	selected = -1
 	game._set_drawing(true)
+	if state.active_owner == 0:
+		var choice = DAMAGE_CHOICE.new()
+		game.add_child(choice)
+		await choice.choose(state)
+		choice.queue_free()
 	var snapshot: Dictionary = state.units.duplicate()
 	var results: Array[Dictionary] = state.resolve()
 	var defeated: Dictionary = {}
@@ -191,14 +221,16 @@ func resolve_combat() -> void:
 				PlayerState.current_life -= result.damage
 			message.text = "Ataque direto: %d de dano ao jogador." % result.damage
 		elif result.defeated:
-			defeated[result.target] = snapshot[result.target]
-			message.text = "Carta derrotada: o ataque superou sua vida."
+			message.text = "Dano simultâneo: criaturas com dano igual ou maior que a resistência vão ao cemitério."
 		else:
-			message.text = "A carta resistiu. Sua vida permanece igual."
+			message.text = "Dano marcado nas criaturas até o fim do turno."
+		for id in result.defeated_ids:
+			defeated[id] = snapshot[id]
 	for id in defeated:
 		var unit: Dictionary = defeated[id]
 		var view = game.board.card_for_unit(id)
 		if view != null:
+			arcs.remove_card(view)
 			await game.board.send_to_graveyard(view, unit.owner == 1)
 		var deck = game.enemy if unit.owner == 1 else game.player
 		var field = game.enemy_field_cards if unit.owner == 1 else game.field_cards
@@ -216,7 +248,8 @@ func resolve_combat() -> void:
 
 func use_spell(data: CardData, owner: int) -> void:
 	message.text = "%s: efeito ainda não implementado; será enviado ao cemitério." % data.card_name
-	await game.board.present_spell(data, owner == 1)
+	var hand: Control = game.enemy_hand if owner == 1 else game.hand
+	await game.spell_preview.present(data, game.card_zoom, hand.get_global_rect().get_center(), game.board, owner == 1)
 	var deck = game.enemy if owner == 1 else game.player
 	deck.graveyard.append(data)
 	game._update_piles()
@@ -244,21 +277,23 @@ func refresh() -> void:
 		var unit: Dictionary = state.units[view.unit_id]
 		var color := Color.TRANSPARENT
 		var label := ""
-		if unit.data.attack == 0:
-			label = "Só defesa"
-		elif unit.used:
-			label = "Já atacou"
+		view.set_tapped(unit.used)
+		if unit.used:
+			label = "Virada"
 		elif unit.entered >= state.turns[unit.owner]:
 			label = "Aguarda turno"
 		for i in range(state.attacks.size()):
 			var order: Dictionary = state.attacks[i]
 			if order.attacker == unit.id:
-				color = Color(1.0, 0.16, 0.20)
+				color = Color(1.0, 0.16, 0.20, 0.65)
 				label = "Ataque %d" % (i + 1)
-			if state.blockers.get(order.attacker, -1) == unit.id:
-				color = Color(0.08, 0.48, 0.98)
+			if state.blockers.get(order.attacker, []).has(unit.id):
+				color = Color(0.08, 0.48, 0.98, 0.65)
 				label = "Defesa %d" % (i + 1)
 		if selected == unit.id:
-			color = Color(1.0, 0.85, 0.12)
+			if color.a == 0.0:
+				color = Color(0.08, 0.48, 0.98, 0.65) if state.phase == "defense" else Color(1.0, 0.16, 0.20, 0.65)
 			label = "Selecionada" if label.is_empty() else "Selecionada · " + label
+		if unit.damage > 0:
+			label += " · %d/%d dano" % [unit.damage, unit.data.health]
 		view.set_combat_mark(color, label)

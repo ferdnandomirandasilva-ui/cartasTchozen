@@ -1,6 +1,6 @@
 extends Control
 
-const DEFENSE_COLOR := Color(0.16, 0.55, 1.0)
+const DEFENSE_COLOR := Color(0.16, 0.55, 1.0, 0.55)
 var game: Control
 var connections: Array[Dictionary] = []
 
@@ -16,13 +16,20 @@ func set_orders(attacks: Array[Dictionary], blockers: Dictionary, _owner: int) -
 		var order: Dictionary = attacks[i]
 		var attacker = game.board.card_for_unit(order.attacker)
 		if blockers.has(order.attacker):
-			var defender = game.board.card_for_unit(blockers[order.attacker])
-			connections.append({"from": defender, "to": attacker, "color": DEFENSE_COLOR, "bend": -1.15 - i * 0.12})
+			for j in range(blockers[order.attacker].size()):
+				var defender = game.board.card_for_unit(blockers[order.attacker][j])
+				connections.append({"from": defender, "to": attacker, "color": DEFENSE_COLOR, "bend": -1.15 - i * 0.12 - j * 0.2})
 	queue_redraw()
 
 func _process(_delta: float) -> void:
 	if not connections.is_empty():
 		queue_redraw()
+
+func remove_card(card: Node3D) -> void:
+	for i in range(connections.size() - 1, -1, -1):
+		if connections[i].from == card or connections[i].to == card:
+			connections.remove_at(i)
+	queue_redraw()
 
 func _screen_point(node: Node) -> Variant:
 	if not is_instance_valid(node) or node.is_queued_for_deletion():
@@ -60,7 +67,7 @@ func _draw() -> void:
 		for step in range(49):
 			var t := float(step) / 48.0
 			points.append(start.lerp(control, t).lerp(control.lerp(finish, t), t))
-		draw_polyline(points, Color(0.015, 0.02, 0.03, 0.8), 7.0, true)
+		draw_polyline(points, Color(0.015, 0.02, 0.03, 0.2), 7.0, true)
 		draw_polyline(points, link.color, 3.5, true)
 		var direction := (points[-1] - points[-3]).normalized()
 		var side := direction.orthogonal()

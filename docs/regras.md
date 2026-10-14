@@ -132,15 +132,33 @@ Cada metade colorida agora mede 12,8×4,2, abrangendo os montes sobre a superfí
 
 Até oito cartas usam uma fila larga; acima disso passam a duas filas. Cada fila aproveita sua própria largura e só reduz escala quando necessário. O adversário recebe a mesma disposição espelhada. Retratos, mãos e seus contadores não mudam.As legendas das mãos foram retiradas para não cobrir cartas. O indicador de turno fica entre os retratos na lateral esquerda; os contadores de deck e cemitério ficam junto à borda externa de seus próprios montes, liberando as filas de cartas. Prévia visual com 12 cartas de cada lado usada para conferir ocupação e separação dos espaços.
 ## Combate ativo
-Cada carta de campo tem ID próprio. Ataque estritamente maior que a vida derrota; igualdade ou ataque menor não alteram a vida da carta. Sem contra-ataque e sem dano acumulado. Ataque zero só defende. Cartas novas podem defender imediatamente, mas só atacam no próximo turno de seu dono. Uma fase de ataque por turno e uma declaração por atacante.
+O combate básico segue Magic: o jogador marca atacantes e confirma todas juntas; o adversário associa suas defensoras aos ataques. As criaturas atacam o jogador, sem selecionar criaturas inimigas como alvo. Há uma fase de combate normal por turno e uma segunda oportunidade de jogar cartas depois dela.
 
-Todos os ataques são implicitamente contra o jogador adversário. Use Atacar e clique nas cartas locais que participarão; um segundo clique desmarca a carta. Depois confirme. Não há escolha de carta alvo ou clique obrigatório no retrato. Cancelar ataques limpa a seleção e volta à fase de jogar cartas.
+- Atacantes são viradas ao confirmar a declaração. Permanecem viradas durante o turno adversário e desviram no início do próximo turno do dono. Criaturas viradas não atacam nem bloqueiam.
+- Criaturas recém-jogadas podem bloquear imediatamente, mas precisam aguardar o próximo turno do dono para atacar. Poder zero não impede atacar; o dano causado é zero.
+- Cada defensora normalmente bloqueia uma atacante. Várias defensoras podem bloquear a mesma atacante. Bloquear não vira a defensora.
+- Atacantes e defensoras causam dano simultaneamente, igual ao seu poder. Todas causam seu dano antes da remoção das criaturas derrotadas.
+- Dano igual ou maior que a resistência derrota. Dano insuficiente fica marcado, pode acumular no mesmo turno e é removido no fim do turno para todas as sobreviventes. A resistência da definição da carta não é alterada.
+- A atacante distribui seu poder entre os bloqueadores. Com bloqueio múltiplo, o jogador usa o painel de distribuição; é possível atribuir zero a um bloqueador e todo o dano a outro, sem ordenar mortes. A soma deve corresponder ao poder. O adversário usa uma distribuição automática válida.
+- Atacantes sem bloqueio causam dano ao jogador. Ataques bloqueados não causam dano excedente ao jogador sem a habilidade atropelar.
+- A IA escolhe bloqueios, pode agrupar defensoras e aplica as mesmas regras. Quando a IA ataca, a partida aguarda o jogador escolher e confirmar as defesas.
+- Cartas derrotadas, incluindo atacantes, vão ao cemitério do dono. A vida começa em 20 neste projeto e mana/compra continuam seguindo nossas regras próprias.
 
-Depois da confirmação, o defensor escolhe uma carta própria e a atacante que ela bloqueará. Cada defensora bloqueia um ataque; trocar a associação libera a anterior. Todas as cartas de campo do defensor são elegíveis, inclusive as de ataque zero e as recém-colocadas. Ataques sem bloqueio reduzem a vida do jogador pelo ataque da carta. Ataques bloqueados atingem somente a defensora, mesmo se ela for derrotada; não há dano excedente ao jogador.
-
-O adversário usa o mesmo fluxo: declara suas atacantes, aguarda a seleção local de defesas e só então resolve. Na vez local, a IA escolhe defesas automaticamente. O conjunto confirmado resolve por completo com interação bloqueada; vida zero encerra a partida ao fim do combate. Cartas derrotadas vão para o cemitério com o verso.
-
-Feitiços gastam mana, saem da mão, são apresentados temporariamente e vão ao cemitério. Não entram no campo permanente nem atacam/defendem. A interface avisa que seus efeitos estão pendentes. Habilidades particulares das criaturas também continuam fora do combate básico. Clique direito conserva a inspeção.
+### Limites atuais
+O combate básico está implementado. As cartas atuais ainda não possuem habilidades de combate estruturadas (vigilância, ímpeto, voar, alcance, toque mortífero, iniciativa, golpe duplo, atropelar e indestrutível), planeswalkers ou batalhas. Não há pilha/prioridade para respostas instantâneas. Os efeitos de cartas permanecem pendentes; não se presume que o motor reproduz todas as exceções de Magic.
 
 ## Indicadores atuais
-As atacantes têm legenda vermelha numerada, sem contornos e sem setas para o retrato. O arco azul aparece somente após associar uma defensora a uma atacante e aponta para o ataque bloqueado. A defensora selecionada recebe legenda; os arcos acompanham movimento e redimensionamento e não capturam cliques. Cancelamento e fim da resolução removem as conexões.
+As atacantes têm contorno luminoso e legenda vermelha numerada, ambos translúcidos, sem setas para o retrato. As defensoras têm contorno luminoso azul translúcido. O arco azul aparece somente após associar uma defensora a uma atacante e aponta para o ataque bloqueado. A defensora selecionada recebe legenda; os arcos acompanham movimento e redimensionamento e não capturam cliques. Cancelamento e fim da resolução removem as conexões.
+### Exibição de feitiços
+- Feitiços usados por qualquer jogador aparecem diretamente em uma prévia lateral à direita, menor que o zoom tradicional e com descrição visível. Não entram na mesa.
+- A prévia permanece por 3 segundos, além das transições de entrada e saída. Clique direito abre o zoom tradicional; a contagem pausa durante essa leitura.
+- Ao terminar a exibição, a carta segue diretamente para o cemitério do dono, que mostra apenas o verso.
+- Os efeitos de Preocupado e Sério continuam pendentes por decisão do usuário: suas descrições ainda não especificam regras ou valores de jogo.
+- A prévia do feitiço fica mais próxima do centro (76% da largura e 56% da altura). A carta chega da região da mão do dono com uma volta completa em 0,55 segundo; os 3 segundos de exibição começam após a chegada.
+- Cartas derrotadas levantam da mesa e percorrem um arco até o cemitério do dono em 0,65 segundo, alinhando-se ao monte e mostrando o verso na chegada. Feitiços voam diretamente da prévia lateral ao cemitério após os 3 segundos, reduzindo para o tamanho projetado do monte e virando para o verso durante o percurso.
+- Atacantes e defensoras recebem contorno luminoso translúcido vermelho e azul, respectivamente. Legendas coloridas e arcos azuis também são translúcidos e permanecem durante a resolução. Antes de uma carta partir ao cemitério, removem-se seu contorno, legenda e todas as conexões que a envolvem. As marcas restantes desaparecem ao encerrar o combate.
+
+## Recursos nativos atuais
+- Vida inicial e limite máximo nativo: 20 para ambos os jogadores, substituindo os valores anteriores de 100.
+- Cada jogador dispõe de 3 mana no primeiro turno. Após uma rodada completa (turno do jogador e turno do adversário), a capacidade de ambos aumenta simultaneamente em 1 até o limite de 9, e a mana de ambos recarrega. O primeiro turno do adversário também começa em 3.
+- Aumentar capacidade só acontece ao concluir a rodada, não ao trocar para o turno adversário, confirmar ataques, bloqueios ou jogar cartas. Os limites nativos são aplicados pelo estado dos recursos e a interface acompanha as alterações.

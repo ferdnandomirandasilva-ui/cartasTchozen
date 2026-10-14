@@ -257,23 +257,39 @@ func animate_attack(attacker: Node3D, target: Vector3) -> void:
 	motion.tween_property(attacker, "position", home, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await motion.finished
 
+func graveyard_screen_position(opposite: bool) -> Vector2:
+	var at: Vector3 = piles.enemy_graveyard if opposite else piles.player_graveyard
+	return camera.unproject_position(at + Vector3(0, 0.10, 0))
+
+func graveyard_screen_size(opposite: bool) -> Vector2:
+	var at: Vector3 = piles.enemy_graveyard if opposite else piles.player_graveyard
+	var bounds := Rect2(camera.unproject_position(at), Vector2.ZERO)
+	for x in [-0.64, 0.64]:
+		for z in [-0.89, 0.89]:
+			bounds = bounds.expand(camera.unproject_position(at + Vector3(x, 0.10, z)))
+	return bounds.size
+
 func send_to_graveyard(card: Node3D, opposite: bool) -> void:
 	cards.erase(card)
 	card.set_combat_mark(Color.TRANSPARENT)
+	if card.movement != null:
+		card.movement.kill()
+	if card.turning != null:
+		card.turning.kill()
 	var destination: Vector3 = piles.enemy_graveyard if opposite else piles.player_graveyard
-	card.move_to(destination + Vector3(0, 0.10, 0), 1.0, 0.45)
-	await card.movement.finished
+	var start: Vector3 = card.position
+	var start_scale: Vector3 = card.scale
+	var start_rotation: float = card.rotation.y
+	var flight := create_tween()
+	flight.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	flight.tween_method(func(t: float):
+		card.position = start.lerp(destination + Vector3(0, 0.10, 0), t) + Vector3(0, sin(t * PI) * 0.7, 0)
+		card.scale = start_scale.lerp(Vector3.ONE, t)
+		card.rotation.y = lerpf(start_rotation, PI if opposite else 0.0, t)
+	, 0.0, 1.0, 0.65)
+	await flight.finished
 	card.show_back(CARD_BACK)
 	await get_tree().create_timer(0.10).timeout
 	card.hide()
 	card.queue_free()
 	_arrange_cards()
-
-func present_spell(data: CardData, opposite: bool) -> void:
-	var card = CARD_3D.new()
-	add_child(card)
-	card.setup(data, face_cache.get_face(data), opposite)
-	card.position = Vector3(0, 0.12, -0.95 if opposite else 0.95)
-	card.set_combat_mark(Color(0.65, 0.32, 0.95), "Feitiço · efeito pendente")
-	await get_tree().create_timer(0.9).timeout
-	await send_to_graveyard(card, opposite)

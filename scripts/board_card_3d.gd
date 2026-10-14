@@ -2,12 +2,17 @@ extends Node3D
 
 const WIDTH := 1.25
 const HEIGHT := 1.741
+const COMBAT_GLOW = preload("res://scripts/card_combat_glow.gdshader")
+var glow: MeshInstance3D
+var glow_material: ShaderMaterial
 var data: CardData
 var opponent := false
 var movement: Tween
 var unit_id := -1
 var face_material: StandardMaterial3D
 var status_label: Label3D
+var tapped := false
+var turning: Tween
 
 func setup(card_data: CardData, texture: Texture2D, other_side: bool = false) -> void:
 	data = card_data
@@ -37,6 +42,18 @@ func setup(card_data: CardData, texture: Texture2D, other_side: bool = false) ->
 	face_material = material
 	face.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(face)
+	glow = MeshInstance3D.new()
+	var glow_quad := QuadMesh.new()
+	glow_quad.size = Vector2(WIDTH + 0.22, HEIGHT + 0.22)
+	glow.mesh = glow_quad
+	glow.rotation.x = -PI / 2.0
+	glow.position.y = 0.028
+	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	glow_material = ShaderMaterial.new()
+	glow_material.shader = COMBAT_GLOW
+	glow.material_override = glow_material
+	add_child(glow)
+	glow.hide()
 	rotation.y = PI if opponent else 0.0
 	status_label = Label3D.new()
 	status_label.position = Vector3(0, 0.10, HEIGHT / 2.0 + 0.12)
@@ -49,6 +66,18 @@ func setup(card_data: CardData, texture: Texture2D, other_side: bool = false) ->
 func set_combat_mark(color: Color, status: String = "") -> void:
 	status_label.text = status
 	status_label.modulate = color if color.a > 0.0 else Color.WHITE
+	glow.visible = color.a > 0.0
+	if glow.visible:
+		glow_material.set_shader_parameter("mark_color", color)
+
+func set_tapped(value: bool) -> void:
+	if tapped == value:
+		return
+	tapped = value
+	if turning != null:
+		turning.kill()
+	turning = create_tween()
+	turning.tween_property(self, "rotation:y", (PI if opponent else 0.0) + (PI / 2.0 if tapped else 0.0), 0.2)
 
 func show_back(texture: Texture2D) -> void:
 	face_material.albedo_texture = texture

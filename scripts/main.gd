@@ -2,6 +2,7 @@ extends Control
 const CARD_SCENE = preload("res://scenes/card.tscn")
 const DECK_STATE = preload("res://scripts/deck_state.gd")
 const CARD_ZOOM = preload("res://scripts/card_zoom.gd")
+const SPELL_PREVIEW = preload("res://scripts/spell_preview.gd")
 const PORTRAIT_STATUS = preload("res://scripts/portrait_counters.gd")
 const BOARD_3D = preload("res://scripts/board_3d.gd")
 const OPPONENT_POLICY = preload("res://scripts/opponent_policy.gd")
@@ -11,6 +12,7 @@ var board: Node3D
 var player_hud: Control
 var opponent_hud: Control
 var card_zoom: Control
+var spell_preview: Control
 var player = DECK_STATE.new()
 var enemy = DECK_STATE.new()
 var hand_cards: Array[Card] = []
@@ -146,6 +148,9 @@ func _build_table() -> void:
 	card_zoom.z_index = 1000
 	add_child(card_zoom)
 	board.inspect_requested.connect(card_zoom.open_data)
+	spell_preview = SPELL_PREVIEW.new()
+	spell_preview.z_index = 500
+	add_child(spell_preview)
 
 func _add_card_to_hand(data: CardData) -> Card:
 	var card: Card = CARD_SCENE.instantiate()
@@ -409,7 +414,7 @@ func _on_end_turn_pressed() -> void:
 		return
 	PlayerState.set_turn(PlayerState.TurnOwner.ENEMY)
 	combat.start_turn(1)
-	PlayerState.opponent_mana = PlayerState.opponent_max_mana
+	PlayerState.start_mana_turn(PlayerState.TurnOwner.ENEMY)
 	_set_drawing(true)
 	await _draw_animated(enemy, true, 2)
 	await _play_opponent_turn()
@@ -442,6 +447,12 @@ func _play_opponent_card(index: int) -> void:
 	enemy.hand.remove_at(index)
 	enemy_cards.remove_at(index)
 	PlayerState.opponent_mana -= cost
+	if data.is_spell():
+		card.hide()
+		card.queue_free()
+		_arrange_cards()
+		await combat.use_spell(data, 1)
+		return
 	card.reparent(drag_layer)
 	card.z_index = 200
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -457,19 +468,17 @@ func _play_opponent_card(index: int) -> void:
 	# Keep the travelling card anonymous; reveal data only on the public field.
 	card.hide()
 	card.queue_free()
-	if data.is_spell():
-		await combat.use_spell(data, 1)
-	else:
-		enemy_field_cards.append(data)
-		var view = board.add_card(data, target, true)
-		combat.register_card(data, 1, view)
+	enemy_field_cards.append(data)
+	var view = board.add_card(data, target, true)
+	combat.register_card(data, 1, view)
 	_update_piles()
 
 func start_player_turn() -> void:
 	if combat.finished:
 		return
+	PlayerState.complete_round()
 	combat.start_turn(0)
-	PlayerState.reset_mana()
+	PlayerState.start_mana_turn(PlayerState.TurnOwner.PLAYER)
 	PlayerState.set_turn(PlayerState.TurnOwner.PLAYER)
 	_set_drawing(true)
 	await _draw_animated(player, false, 2)
